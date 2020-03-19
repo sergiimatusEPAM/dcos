@@ -16,6 +16,7 @@ LOG = logger.get_logger(__name__)
 
 class RCCONTEXT_ITEM:
     """Element of resource rendering context."""
+    MASTER_LOCATION = 'master_location'
     MASTER_PRIV_IPADDR = 'master_priv_ipaddr'
     LOCAL_PRIV_IPADDR = 'local_priv_ipaddr'
     ZK_CLIENT_PORT = 'zk_client_port'
@@ -147,17 +148,27 @@ class ResourceContext:
                               fallback=cm_const.ZK_CLIENTPORT_DFT))
             for s in cluster_conf.sections() if s.startswith('master-node')
         ]
-        master_priv_ipaddr = mnode_cfg_items[0][0] if mnode_cfg_items else (
-            '127.0.0.1'
-        )
-        zk_client_port = mnode_cfg_items[0][1] if mnode_cfg_items else (
-            cm_const.ZK_CLIENTPORT_DFT
-        )
+        if mnode_cfg_items:
+            master_priv_ipaddr = mnode_cfg_items[0][0]
+            zk_client_port = mnode_cfg_items[0][1]
+            dsc_type = self._cluster_conf.get('discovery', {}).get('type')
+            if dsc_type == 'static':
+                master_location = f'{master_priv_ipaddr}:{zk_client_port}'
+            else:
+                master_location = ",".join(
+                    [escape(f'{v[0]}:{v[1]}') for v in mnode_cfg_items])
+        else:
+            master_priv_ipaddr = '127.0.0.1'
+            zk_client_port = cm_const.ZK_CLIENTPORT_DFT
+
+            master_location = f'{master_priv_ipaddr}:{zk_client_port}'
+
         local_priv_ipaddr = cluster_conf.get(
             'local', 'privateipaddr', fallback='127.0.0.1'
         )
 
         items = {
+            RCCONTEXT_ITEM.MASTER_LOCATION: escape(master_location),
             RCCONTEXT_ITEM.MASTER_PRIV_IPADDR: escape(master_priv_ipaddr),
             RCCONTEXT_ITEM.LOCAL_PRIV_IPADDR: escape(local_priv_ipaddr),
             RCCONTEXT_ITEM.ZK_CLIENT_PORT: escape(zk_client_port)
